@@ -1,618 +1,503 @@
-# GIC — Gig Income Coverage
-### Automatic Parametric Income Protection for Delivery Workers · Phase 3 v3.2
+# GigInsura
+### AI-Powered Parametric Income Insurance for India's Gig Economy · Phase 3 v3.2
 
-> **No claim forms. No human adjusters. No waiting.**
-> GIC monitors weather, peer activity, and fraud signals in real-time — and pays out to UPI in under 4 minutes when a disruption is confirmed.
-
----
-
-## Table of Contents
-
-1. [What is GIC?](#what-is-gic)
-2. [Screenshots](#screenshots)
-3. [Architecture Overview](#architecture-overview)
-4. [The GIC AI Engine](#the-gic-ai-engine)
-5. [The Traffic System](#the-traffic-system)
-6. [External APIs](#external-apis)
-7. [API Reference](#api-reference)
-8. [Admin Dashboard](#admin-dashboard)
-9. [Database Models](#database-models)
-10. [Getting Started](#getting-started)
-11. [Environment Variables](#environment-variables)
-12. [What Sets GIC Apart](#what-sets-gic-apart)
-13. [Pitch](#pitch)
-14. [Collaborators](#collaborators)
-
+> **No claim forms. No manual adjusters. No waiting.**
+> GigInsura is an automated, trigger-based parametric income protection platform designed exclusively for food delivery partners (e.g., Zomato and Swiggy). By monitoring weather, zone-wide peer activity, and native device fraud signals in real-time, GigInsura auto-triggers and pays out claims via UPI in under 4 minutes when disruptions occur.
 
 ---
 
-## What is GIC?
+## 📑 Table of Contents
 
-GIC (Gig Income Coverage) is a **parametric income insurance platform** built specifically for food delivery workers in Chennai. Instead of the traditional insurance model — file a claim, wait for an adjuster, maybe get paid weeks later — GIC works on a trigger-based, fully automated pipeline:
-
-1. Rain crosses your zone's threshold (≥15 mm/hr by default)
-2. Your order activity drops >1.5σ below your personal baseline
-3. 80+ zone peers on the same platform confirm the disruption
-4. AI-3 runs a fraud check in milliseconds
-5. **₹100–500 is transferred to your UPI in ~4 minutes**
-
-Coverage costs between **₹29 and ₹89/week**, computed fresh each week by a neural network that weighs zone flood risk, your streak, seasonal patterns, and a 7-day rainfall forecast.
-
----
-
-## Screenshots
-
-### Admin Dashboard — Overview
-
-> _Add screenshot here: the full admin overview panel showing active policies, weekly GPW, BCR by zone, fraud flags, and payout stats_
-
-<img width="1600" height="757" alt="image" src="https://github.com/user-attachments/assets/56e8c9de-b800-489d-b0f7-a819afac4dea" />
+1. [Overview](#-overview)
+2. [Problem Statement](#-problem-statement)
+3. [Our Solution](#-our-solution)
+4. [Worker Persona & Scenarios](#-worker-persona--scenarios)
+5. [Application Workflow](#-application-workflow)
+6. [Weekly Pricing & Dynamic Premiums](#-weekly-pricing--dynamic-premiums)
+7. [Parametric Triggers](#-parametric-triggers)
+8. [The GigInsura AI Engine](#-the-giginsura-ai-engine)
+9. [Fraud Detection & Anti-Spoofing](#-fraud-detection--anti-spoofing)
+10. [System Architecture](#-system-architecture)
+11. [Database Models](#-database-models)
+12. [API Reference](#-api-reference)
+13. [Admin Dashboard](#-admin-dashboard)
+14. [Local Setup](#-local-setup)
+15. [Project Metadata & Team](#-project-metadata--team)
 
 ---
 
-### Admin Dashboard — AI Model Info Panel
+## 📌 Overview
 
-> _Add screenshot here: the AI model info card showing all 5 neural net models, their feature counts, training approach, and live status_
+**GigInsura** is built to shield India's food delivery workers from the financial impacts of hyper-local disruptions they cannot control. Extreme rainfall, toxic air quality, heatwaves, and local curfews directly slash order volume and disrupt earnings. 
 
-`docs/screenshots/admin-model-info.png`
-<img width="1253" height="674" alt="image" src="https://github.com/user-attachments/assets/b58ac8df-ece3-49d6-9c59-8fd4a280a973" />
+Using localized environmental APIs and peer verification networks, GigInsura automates the underwriting, policy management, and claim-payment cycle. A weekly subscription covers income loss with no manual documentation, processing instant claims directly to the worker's UPI ID.
 
----
-
-### AI Chat Assistant
-
-> _Add screenshot here: the in-app Grok-3-mini chat showing a worker asking about their premium and receiving a contextual breakdown_
-
-`docs/screenshots/ai-chat.png`
-<img width="223" height="247" alt="image" src="https://github.com/user-attachments/assets/03767df3-31f8-4e88-9d7b-ac9db6e78af7" />
-
-
-<img width="259" height="741" alt="image" src="https://github.com/user-attachments/assets/22ef27db-a3b0-4ac4-b284-fba35a8ca5aa" />
-
+> [!IMPORTANT]
+> **Coverage Scope:** GigInsura protects **income loss ONLY**. Accidental, health, life, and vehicle damage coverages are strictly excluded.
 
 ---
 
-## Architecture Overview
+## 🎯 Problem Statement
 
-```
-┌─────────────────────────────────────────────────┐
-│                  index.html                      │
-│         Worker App + Admin Dashboard             │
-└──────────────┬──────────────────────────────────┘
-               │ REST API
-┌──────────────▼──────────────────────────────────┐
-│               server.js  (Express v4)            │
-│                                                  │
-│  ┌──────────┐  ┌──────────┐  ┌────────────────┐ │
-│  │  Auth    │  │  Worker  │  │  Claims        │ │
-│  │  Routes  │  │  Routes  │  │  + Trigger     │ │
-│  └──────────┘  └──────────┘  └────────────────┘ │
-│  ┌──────────┐  ┌──────────┐  ┌────────────────┐ │
-│  │  Admin   │  │  Zone /  │  │  AI Chat       │ │
-│  │  Routes  │  │ Forecast │  │  (Grok-3-mini) │ │
-│  └──────────┘  └──────────┘  └────────────────┘ │
-│                                                  │
-│  ┌─────────────────────────────────────────────┐ │
-│  │              ml.js — 4 Neural Nets          │ │
-│  │  AI-1 Premium · AI-3 Fraud · Churn · Fcst  │ │
-│  └─────────────────────────────────────────────┘ │
-│                                                  │
-│  ┌─────────────┐   ┌───────────┐  ┌──────────┐  │
-│  │  Open-Meteo │   │   WAQI    │  │  X.AI    │  │
-│  │   Weather   │   │    AQI    │  │  Grok    │  │
-│  └─────────────┘   └───────────┘  └──────────┘  │
-└──────────────┬──────────────────────────────────┘
-               │ mongoose
-┌──────────────▼──────────────────────────────────┐
-│              MongoDB Atlas                        │
-│   Workers · Policies · Claims · FraudFlags       │
-│   TriggerHistory                                 │
-└─────────────────────────────────────────────────┘
-```
+India's gig workers represent a massive, vulnerable workforce carrying 100% of the financial risk of external disruptions.
+
+| The Reality | The Gap |
+| :--- | :--- |
+| **5 Crore+ gig workers** across India | No tailored income protection product exists. |
+| **20–30% monthly earnings** lost to climate & curfew disruptions | Traditional insurance is annual, expensive, and paperwork-heavy. |
+| Disruptions are **measurable and verifiable** | Claims verification processes are manual, slow, and lack real-time automation. |
+| Workers earn and budget on a **week-to-week cycle** | Policies demand upfront annual or monthly commitments. |
 
 ---
 
-## The GIC AI Engine
+## 💡 Our Solution
 
-GIC runs **five purpose-trained neural networks** via `brain.js`, plus a parametric payout formula and an LLM chat layer.
+GigInsura operates on three core pillars:
 
----
-
-### AI-1 · Neural Net Premium Engine (`GIC-NN-v3.2`)
-
-**What it does:** Calculates each worker's weekly premium from scratch, personalised to their risk profile.
-
-**Inputs (6 features):**
-| Feature | Description |
-|---|---|
-| `zone_risk` | Flood risk score for the worker's zone (0.15 low → 0.90 critical) |
-| `streak` | Claim-free streak, normalised (0–1 over 12 weeks) |
-| `active_days` | Days active in the last 30, normalised |
-| `bcr` | Baseline Claim Ratio — historical payout frequency for the zone pool |
-| `forecast_risk` | Binary: does the 7-day forecast show high trigger probability? |
-| `seasonal` | Month-adjusted seasonal weight (monsoon season = 0.85) |
-
-**Output:** A raw score (0–1) mapped to **₹29 floor → ₹89 ceiling**.
-
-**Premium breakdown shown to workers:**
-- Base: ₹29
-- Zone adjustment: ±₹28 (Velachery critical adds the most)
-- Streak discount: up to −₹18 for a 12-week clean run
-- Forecast surcharge: +₹10 if heavy rain is forecast, −₹5 if skies are clear
-- Seasonal adjustment: +₹7 in October–November (northeast monsoon peak)
-
-**Training:** ~500 synthetic samples generated from domain-rule combinations across all zone/streak/seasonal/BCR combinations, with controlled noise.
+1. 🤖 **AI Risk Engine** – Computes dynamic weekly premiums using hyper-local risk profiles and seasonal patterns, keeping policies affordable.
+2. ⚡ **Parametric Automation** – Checks weather, air quality, and curfew conditions. If thresholds are breached and peer activity drops, payouts are instantly triggered without manual claims.
+3. 🔐 **Fraud Shield** – A multi-layer verification system combining GPS velocity checks, mock location detection, and network fingerprinting with a photo-based Escrow state to prevent location spoofing.
 
 ---
 
-### AI-2 · Severity-Weighted Payout Calculator
+## 👤 Worker Persona & Scenarios
 
-**What it does:** Computes the exact rupee payout the moment a claim is confirmed. No neural net — this is a transparent parametric formula so every payout is fully auditable.
+**Target Persona:** Full-time food delivery partners on Zomato / Swiggy in metropolitan Indian cities. Aged 20–35, earning ₹8,000–₹15,000 per week, budgeting week-to-week, and working long shifts entirely on mobile devices.
 
-**Formula:**
-```
-intensity   = clamp((rainfall_mm_hr − 15) / 20, 0, 1)
-drop_ratio  = clamp(activity_drop_sigma / 3.0, 0, 1)
-multiplier  = 0.55 + intensity × 0.25 + drop_ratio × 0.20
-payout      = round(shift_baseline_earnings × multiplier)
-payout      = clamp(payout, ₹100, ₹500)
+### 🌧️ Scenario 1 — Heavy Rainfall (Genuine Disruption)
+* **Context:** Raju (27) delivers in South Delhi. Monsoon rains peak at 58mm/hr in his zone, order counts crash, and roads flood. He parks his bike for 4 hours.
+* **Without GigInsura:** Raju loses ₹400 in daily earnings with no recourse.
+* **With GigInsura (Standard Plan):** 
+  1. The background trigger engine polls the weather API and detects rainfall > 15mm/hr.
+  2. The system confirms Raju's location is in the affected zone and notes a drop in order activity.
+  3. Zone peers confirm the disruption (no outliers). The fraud engine clears the claim.
+  4. ₹400 is automatically paid out to Raju's UPI. 
+  5. Raju receives a push notification: *"Heavy rain detected. ₹400 credited to UPI. Stay safe, Raju."*
+
+### ☁️ Scenario 2 — Hazardous AQI (Air Quality Disruption)
+* **Context:** Priya (24) delivers in Noida. Smog pushes the AQI to 435 (Severe). Outdoor advisories urge residents to stay inside.
+* **With GigInsura (Pro Plan):**
+  1. Air quality API registers AQI > 300.
+  2. The system detects Priya is offline or order volume has crashed.
+  3. A parametric claim triggers, resulting in a ₹700 payout to her UPI wallet, alongside a health alert.
+
+### 🚓 Scenario 3 — Curfew / Zone Restriction
+* **Context:** Arjun (31) delivers in Old Delhi. A sudden curfew/Section 144 order is declared at 6 PM. Arjun cannot access his primary delivery cluster.
+* **With GigInsura (Standard Plan):**
+  1. Civic alert APIs flag active curfew boundaries in Old Delhi.
+  2. Raju's GPS confirms he is attempting to work near the boundary but is blocked.
+  3. Payout triggers automatically, compensating for lost shift hours.
+
+### 🛡️ Scenario 4 — Fraud Attempt (Location Spoofing)
+* **Context:** A user attempts to use a GPS spoofing app to simulate presence inside a flooded zone in Delhi while remaining at home.
+* **GigInsura's Shield:**
+  1. **GPS Velocity Check:** The system detects a shift of 9km in 2 seconds -> anomaly flagged.
+  2. **OS Mock Check:** The backend catches native Android/iOS flags indicating a mock location provider is active.
+  3. **Network Check:** IP address remains static while GPS coordinates shift -> flagged.
+  4. **Escrow State:** Instead of instant rejection, the claim is placed in Escrow. GigInsura sends a notification: *"Please upload a quick photo of your surroundings to verify your claim."*
+  5. Without a valid, geo-tagged surroundings photo, the claim is rejected.
+
+---
+
+## 🔄 Application Workflow
+
+```mermaid
+flowchart TD
+    A([Worker Opens App]) --> B[Onboarding\nPlatform · Zone · Location · UPI]
+    B --> C[AI Risk Engine\nGenerates Premium Rate]
+    C --> D[Policy Enrollment\nBasic · Standard · Pro Plans]
+    D --> E[Weekly Premium Deducted]
+    E --> F{Trigger Engine\nPolls Weather/AQI/Curfew APIs}
+    F -->|No Breach| F
+    F -->|Threshold Breached| G[Adaptive Activity Check\nCompare with Peer Cohort]
+    G -->|Activity Drop Confirmed| H[Fraud Engine\nGPS, OS Flags, IP Check]
+    G -->|No Shift Activity Drop| F
+    H -->|PASS: Clean| I[Instant UPI Payout\nAuto-completed < 4 mins]
+    H -->|FLAG: Anomaly| J[Escrow State\nRequest Surrounding Photo]
+    J -->|Valid Photo Uploaded| K[Admin Dashboard Review]
+    J -->|Timeout / Invalid Photo| L([Claim Denied])
+    K -->|Approved| I
+    K -->|Rejected| L
+    I --> M([Push Notification\nPayout Confirmed])
 ```
 
-A worker with a ₹310 dinner baseline in a 21mm/hr storm with a 2.5σ activity drop gets approximately **₹310 × 0.85 = ₹264**, floored at ₹100 and capped at ₹500. Workers can verify this themselves.
+---
+
+## 💰 Weekly Pricing & Dynamic Premiums
+
+GigInsura aligns its subscription cycles directly with the weekly payout schedules of Swiggy and Zomato partners.
+
+### Core Insurance Plans
+
+| Plan | Weekly Premium (Base) | Payout Cap | Target Audience |
+| :--- | :---: | :---: | :--- |
+| 🟢 **Basic** | ₹15 / week | ₹200 | Part-time riders, low-risk zones |
+| 🟡 **Standard** | ₹30 / week | ₹400 | Full-time riders, moderate-risk zones |
+| 🔴 **Pro** | ₹50 / week | ₹700 | High-income riders, high-risk zones |
+
+### Dynamic Premium Formula
+In the codebase, premiums are adjusted dynamically each week within a range of **₹29 (Floor) to ₹89 (Ceiling)**. The premium calculation uses the following neural model adjustments:
+* **Base Premium:** ₹29
+* **Zone Risk:** Adds up to +₹28 for critical zones (e.g., Velachery).
+* **Claims Streak:** Deducts up to -₹18 for consistent claim-free weeks.
+* **Weather Forecast:** Adds +₹10 if the next 7 days show high rain probability; deducts -₹5 if clear.
+* **Seasonal Weight:** Adds +₹7 during peak monsoon months (e.g., October–November).
 
 ---
 
-### AI-3 · Neural Net Fraud Detection (`GIC-NN-v3.2` — fraud head)
+## ⚡ Parametric Triggers
 
-This is GIC's most sophisticated component. It combines **peer cohort comparison** with a **neural anomaly scorer** to distinguish genuine zone-wide disruptions from individual bad actors.
+Claims trigger automatically when environmental indices exceed defined bounds and coincide with worker activity drops:
 
-**Step 1 — Peer Activity Stats**
-
-Before any fraud scoring, the system pulls the real-time activity of all same-platform, same-zone workers from MongoDB. If fewer than 5 real peers exist, it synthesises a deterministic cohort (seeded by zone, platform, and hour) for demo stability.
-
-Peer metrics computed:
-- `peerDrop` — average normalised activity drop across the cohort
-- `peerMedianDrop` — median (robust to outliers)
-- `peerDropStdDev` — standard deviation
-- `peerLowActivityPct` — % of peers with a severe drop (≥0.55 normalised)
-- `peerClaimRate` — claims per peer in the last 7 days
-- `peerAvgPayout` — average payout across confirmed peer claims
-
-**Step 2 — Five Fraud Signals (inputs to neural net):**
-| Signal | Description | Weight in training |
-|---|---|---|
-| `peerDivScore` | How much worse is *this* worker vs zone peers? | 35% |
-| `newAcctScore` | Account age at claim time (< 7 days = high risk) | 20% |
-| `freqScore` | Claims filed in the past 7 days | 20% |
-| `rainGapScore` | Severe activity drop at marginal rainfall | 15% |
-| `temporalScore` | Temporal clustering of claims | 10% |
-
-**Output:** Anomaly score 0–1, mapped to:
-- `clean` (< 0.40) → payout proceeds immediately
-- `soft` (0.40–0.65) → flagged for 2-hour review, payout held
-- `hard` (> 0.65) → blocked, escalated to admin queue
-
-All flags are persisted to MongoDB with full signal breakdown for audit. The admin can clear or reject each flag from the dashboard.
+| # | Disruption Event | Data Source | Threshold | Action |
+| :---: | :--- | :--- | :--- | :--- |
+| 1 | **Heavy Rainfall** | Open-Meteo API | ≥ 15 mm/hr | Instant Parametric Payout |
+| 2 | **Severe Air Quality** | WAQI API | AQI > 300 | Instant Parametric Payout |
+| 3 | **Curfew / Security** | Civic Alerts | Zone restricted | Instant Parametric Payout |
+| 4 | **Extreme Heatwave** | Open-Meteo API | Temp > 45°C | Instant Parametric Payout |
 
 ---
 
-### Churn Prediction Neural Net (`GIC-CHURN-v3.2`)
+## 🧠 The GigInsura AI Engine
 
-**What it does:** Predicts the probability that a worker will stop renewing their policy.
+The system utilizes **four custom-trained neural networks** powered by `brain.js` running on the Express backend, alongside a parametric calculator and an LLM chat assistant.
 
-**Inputs (6 features):** streak, total claims filed, premium-to-earnings ratio, days since last payout, zone risk, weeks enrolled.
+```
+                  index.html (Worker App & Admin UI)
+                                  │
+                                  │ REST API
+                                  ▼
+                     server.js (Express Backend)
+                                  │
+      ┌───────────────────────────┼───────────────────────────┐
+      ▼                           ▼                           ▼
+    ml.js (AI Engine)       MongoDB Atlas (DB)       External APIs
+    ├─ AI-1 Premium          ├─ Workers               ├─ Open-Meteo (Weather)
+    ├─ AI-3 Fraud Check      ├─ Policies              ├─ WAQI (Air Quality)
+    ├─ Churn Prediction      ├─ Claims                └─ Google Gemini (Chat)
+    └─ Weather Forecast      └─ Fraud Flags
+```
 
-**Used for:** Admin retention dashboards and proactive outreach to at-risk workers.
+### 1. AI-1 — Premium Underwriting Model (`GigInsura-NN-v3.2`)
+* **Purpose:** Sets the weekly premium.
+* **Inputs (6 features):** Zone risk score, claims streak, active days count, baseline claim ratio (BCR) of the zone, 7-day forecast risk, and seasonal weight.
+* **Output:** Normalised risk score mapped to the ₹29–₹89 price scale.
 
-**Endpoint:** `GET /api/ai/churn-prediction/:workerId`
+### 2. AI-2 — Parametric Payout Severity Calculator
+* **Purpose:** Computes the exact payout amount dynamically.
+* **Formula:**
+  ```js
+  intensity   = clamp((rainfall_mm_hr - 15) / 20, 0, 1);
+  drop_ratio  = clamp(activity_drop_sigma / 3.0, 0, 1);
+  multiplier  = 0.55 + (intensity * 0.25) + (drop_ratio * 0.20);
+  payout      = round(shift_baseline_earnings * multiplier);
+  payout      = clamp(payout, 100, 500); // Bounds: ₹100 to ₹500
+  ```
+
+### 3. AI-3 — Peer-Cohort Fraud Anomaly Classifier
+* **Purpose:** Distinguishes genuine zone-wide disruptions from individual bad actors.
+* **Peer Cohort Metrics:** Pulls real-time average activity drop, standard deviation, and claim rate of other active workers in the same zone and platform.
+* **Neural Inputs:**
+  * `peerDivScore` (35% weight) – Divergence of the claimant's activity drop compared to the peer cohort.
+  * `newAcctScore` (20% weight) – Account age (high risk if < 7 days old).
+  * `freqScore` (20% weight) – Number of claims filed in the last 7 days.
+  * `rainGapScore` (15% weight) – Disruption claim made at negligible rainfall level.
+  * `temporalScore` (10% weight) – Timestamps indicating suspicious clustering.
+* **Output:** Anomaly Score (0.0 to 1.0):
+  * `< 0.40` (Clean) → Claim auto-approved; payout proceeds.
+  * `0.40 – 0.65` (Soft Flag) → Held for review, transitions to Escrow state.
+  * `> 0.65` (Hard Flag) → Blocked, flagged for manual Admin review.
+
+### 4. Churn Prediction Neural Net (`GigInsura-CHURN-v3.2`)
+* **Purpose:** Forecasts worker churn probability.
+* **Inputs:** Claims streak, total claims filed, premium-to-earnings ratio, days since last payout, zone risk, weeks enrolled.
+
+### 5. Rainfall Forecast Neural Net (`GigInsura-FORECAST-v3.2`)
+* **Purpose:** Predicts daily trigger probabilities for the next 7 days per zone to adjust premiums and display forecast warnings.
+* **Inputs:** Month, day of week, forecast rainfall average, zone flood propensity, seasonal weight.
 
 ---
 
-### Rainfall Trigger Forecast Neural Net (`GIC-FORECAST-v3.2`)
+## 🛡️ Fraud Detection & Anti-Spoofing
 
-**What it does:** Predicts the probability of a triggering rainfall event for each day in the coming 7-day window, per zone.
+```mermaid
+flowchart LR
+    A([Claim Evaluated]) --> B[GPS Velocity Check]
+    B -->|Impossible Velocity| E[Escrow / Photo Check]
+    B -->|Pass| C[OS Mock Location Flag]
+    C -->|Mock Provider Detected| E
+    C -->|Pass| D[IP Consistency Check]
+    D -->|Static IP with moving GPS| E
+    D -->|Pass| F([Auto Approve & Payout])
+    E --> G{Photo Submission}
+    G -->|Verified| F
+    G -->|Failed / Timeout| H([Claim Rejected])
+```
 
-**Inputs (5 features):** month (0–1), day of week (0–1), forecast rainfall average, zone flood propensity, seasonal weight.
-
-**Output:** `trigger_probability` (0–1) mapped to `low / medium / high` risk, with expected rainfall and estimated payout if triggered.
-
-**Used for:** The 7-day forecast panel in the admin dashboard, and the `safe-choice` proactive alert sent to workers the evening before a predicted disruption.
+1. **GPS Velocity Check:** Compares timestamps and distance. Physical speed anomalies (e.g. moving between zones faster than a motorbike could drive) flag the claim.
+2. **OS Mock Location API:** Detects if developer options or mock location apps are mock-feeding coordinates to the application.
+3. **Network Consistency:** Flags static residential IPs that simulate coordinates moving dynamically in the rain.
+4. **Escrow Flow:** Workers flagged with minor anomalies are not outright blocked. They receive a push alert requesting a geo-tagged photo of their local environment to clear the escrow lock.
 
 ---
 
-## The Traffic System
+## ⚙️ System Architecture
 
-GIC's automated trigger monitor runs as a background daemon inside the Express process and is the heart of the "zero manual claims" promise.
-
-### Trigger Monitor Loop
-
-```
-Runs on startup → then every 5 minutes
-```
-
-**For each active worker in MongoDB:**
-
-1. **Fetch live weather** for the worker's zone from Open-Meteo (10-minute cache per zone)
-2. **Check rain threshold** — if rainfall < zone threshold, skip worker this cycle
-3. **Deduplicate by window** — `firedWindows` Set keyed by `workerId:YYYY-MM-DDTHH` prevents double-payout in the same hour
-4. **Compute peer-informed activity drop:**
-   - Pulls peer cohort activity (real DB data or deterministic synthetic)
-   - `activityDrop = 1.2 + min(1.2, rainExcess/6) + peerJitter + stableNoise`
-   - `stableNoise` uses FNV-1a hash of `workerId + windowKey` — same worker always gets the same noise for the same hour, preventing drift between monitor runs
-5. **Adaptive activity threshold:**
-   - >40% of peers low-activity → threshold drops to 1.3σ (zone-wide event confirmed)
-   - 20–40% peers → 1.5σ threshold
-   - <20% peers → 1.8σ threshold (requires stronger individual signal)
-6. **Run AI-3 fraud check** — hard flags block auto-payout
-7. **Create claim in MongoDB** with full peer context, rainfall, severity, and 4-minute auto-completion
-8. **Log trigger history** to `TriggerHistory` collection
-
-### Trigger State Machine
-
-```
-        ┌─────────┐
-        │  CLEAR  │ ← rainfall < threshold
-        └────┬────┘
-             │ rainfall ≥ threshold
-        ┌────▼──────────┐
-        │  APPROACHING  │ ← 10–14.9 mm/hr
-        └────┬──────────┘
-             │ rainfall ≥ threshold AND activity drop confirmed
-        ┌────▼──────────┐
-        │   TRIGGERED   │ ← AI-3 evaluates
-        └────┬──────────┘
-          ┌──┴──┐
-     clean/soft  hard
-          │       │
-        PAID    REVIEW
-```
-
-### Weather Caching Strategy
-
-| Source | Cache TTL | Fallback |
-|---|---|---|
-| Open-Meteo (rainfall, temperature) | 10 minutes per zone | Rotating 6-state simulation cycle (30s intervals) |
-| WAQI (AQI Chennai) | 30 minutes | Random 80–120 simulation |
-
-The simulation fallback cycles through realistic weather states (4.2mm/hr normal → 21mm/hr triggered) to ensure the UI and trigger logic remain demonstrable without live API connectivity.
+* **Frontend (`index.html`):** A single-page dashboard utilizing responsive CSS. Features both the **Worker Portal** (mock GPS, policy registry, claim tracker, live weather feeds, interactive chat) and the **Admin Console** (KPIs, active fraud queues, neural net details, and live zone weather feeds).
+* **Backend (`server.js`):** Node.js and Express REST API. Controls authentication, policy generation, dynamic pricing, and runs the background parametric trigger daemon.
+* **AI/ML Engine (`ml.js`):** Integrates four `brain.js` neural networks directly into the Express event loop, allowing sub-millisecond local predictions without external infrastructure bottlenecks.
+* **Database (`db.js`):** MongoDB Atlas instance mapping structured collections for workers, active weekly policies, historical claims, active fraud flags, and zone trigger logs.
+* **APIs & LLM Chat:** Polls Open-Meteo for hyper-local rainfall/temperature and WAQI for air quality. Connects to the Google Gemini API (with a local rule-based intent fallback if keys are missing) for conversational policy assistance.
 
 ---
 
-## External APIs
+## 🗃️ Database Models
 
-| Service | Purpose | Env Variable | Fallback |
-|---|---|---|---|
-| **Open-Meteo** | Live hourly rainfall (mm/hr) and temperature per zone | None (free, no key) | 6-state rotating simulation |
-| **WAQI** | Chennai AQI for air quality trigger | `WAQI_TOKEN` | Random AQI 80–120 |
-| **X.AI / Grok-3-mini** | In-app worker AI chat assistant | `XAI_API_KEY` | 8-intent rule-based fallback |
-| **MongoDB Atlas** | Primary database for all collections | `MONGODB_URI` | None — app requires DB for prod |
-
-### Open-Meteo Integration
-
-```
-GET https://api.open-meteo.com/v1/forecast
-  ?latitude={zone_lat}&longitude={zone_lon}
-  &hourly=precipitation
-  &current_weather=true
-  &timezone=Asia/Kolkata
-  &forecast_days=1
-```
-
-The server extracts the current hour's precipitation bucket from the hourly array by matching the ISO timestamp to `current_weather.time`. No API key required.
-
-### WAQI Integration
-
-```
-GET https://api.waqi.info/feed/chennai/?token={WAQI_TOKEN}
-```
-
-Returns `data.aqi` (integer). Used as a secondary trigger condition (AQI ≥ 300 is an air-quality disruption event). Currently displayed but not yet used as an independent payout trigger — planned for Phase 4.
-
-### X.AI / Grok Chat Integration
-
-```
-POST https://api.x.ai/v1/chat/completions
+### Worker Schema
+```json
 {
-  "model": "grok-3-mini",
-  "max_tokens": 500,
-  "temperature": 0.4,
-  "messages": [{ "role": "system", ... }, ...conversation]
+  "_id": "ObjectId",
+  "name": "String",
+  "phone": "String",
+  "platform": "String (Swiggy/Zomato/etc)",
+  "workerId": "String",
+  "zone": "String (e.g. Velachery)",
+  "zoneId": "String",
+  "upi": "String",
+  "activeDays": "Number",
+  "joinDate": "Date",
+  "coverageStatus": "String (building_baseline | active)",
+  "baselineEarnings": {
+    "lunch": "Number",
+    "dinner": "Number",
+    "avg_orders_per_hr": "Number"
+  },
+  "streak": "Number",
+  "riskTier": "String (low/med/high)",
+  "policyStart": "Date"
 }
 ```
 
-12-second timeout with AbortController. Falls back to a rule-based intent matcher covering 8 categories: premium, rain/triggers, fraud/flags, payouts, claims, zones, streaks, and general.
+### Policy Schema
+```json
+{
+  "_id": "ObjectId",
+  "workerId": "String",
+  "weekStart": "Date",
+  "weekEnd": "Date",
+  "premium": "Number",
+  "premiumBreakdown": {
+    "base": "Number",
+    "zoneAdj": "Number",
+    "streakDiscount": "Number",
+    "forecastSurcharge": "Number",
+    "activityAdj": "Number"
+  },
+  "ml_info": {
+    "model": "String",
+    "confidence": "Number",
+    "claim_probability": "Number"
+  },
+  "status": "String (active/expired)",
+  "windows": [
+    { "type": "String", "start": "Date", "end": "Date" }
+  ]
+}
+```
+
+### Claim Schema
+```json
+{
+  "_id": "ObjectId",
+  "workerId": "String",
+  "date": "Date",
+  "shift": "String (lunch/dinner)",
+  "trigger": "String (Rainfall/AQI)",
+  "amount": "Number",
+  "status": "String (processing/paid/review)",
+  "source": "String (automated_monitor/manual_check)",
+  "payoutTime": "Number (minutes)",
+  "upi": "String",
+  "rainfall_mm_hr": "Number",
+  "activity_drop_sigma": "Number",
+  "severity_multiplier": "Number",
+  "weather_source": "String (live/simulated)",
+  "fraud_check": "Boolean",
+  "ai1_approved": "Boolean",
+  "ai2_payout": "Number",
+  "ai2_severity": "Number",
+  "ai3_approved": "Boolean",
+  "ai3_flag": "String (clean/soft/hard)",
+  "ai3_anomaly_score": "Number",
+  "peer_context": {
+    "peer_drop": "Number",
+    "peer_low_activity_pct": "Number",
+    "peer_claim_rate": "Number",
+    "peer_sample_size": "Number",
+    "peer_active_count": "Number",
+    "source": "String"
+  },
+  "initiated_at": "Date",
+  "completed_at": "Date"
+}
+```
+
+### FraudFlag Schema
+```json
+{
+  "_id": "ObjectId",
+  "workerId": "String",
+  "zone": "String",
+  "shift": "String",
+  "type": "String (soft/hard/clear)",
+  "reason": "String",
+  "anomalyScore": "Number",
+  "signals": {
+    "peerDivScore": "Number",
+    "peerDrop": "Number",
+    "peerMedianDrop": "Number",
+    "peerDropStdDev": "Number",
+    "peerLowActivityPct": "Number",
+    "peerClaimRate": "Number",
+    "peerAvgPayout": "Number",
+    "peerSampleSize": "Number",
+    "peerActiveCount": "Number",
+    "newAcctScore": "Number",
+    "freqScore": "Number",
+    "rainGapScore": "Number",
+    "temporalScore": "Number"
+  },
+  "status": "String (reviewing/flagged/cleared/rejected)",
+  "generated_at": "Date",
+  "resolved_at": "Date",
+  "source": "String",
+  "model_version": "String"
+}
+```
 
 ---
 
-## API Reference
+## 🔌 API Reference
 
-### Auth
+### 1. Authentication
+* `POST /api/auth/send-otp` – Requests a login OTP for a phone number.
+* `POST /api/auth/verify-otp` – Verifies the OTP and returns a worker profile along with a JWT.
+* `POST /api/auth/register` – Registers a new worker and automatically initializes their first weekly policy.
 
-| Method | Endpoint | Description |
-|---|---|---|
-| `POST` | `/api/auth/send-otp` | Initiate OTP login via phone number |
-| `POST` | `/api/auth/verify-otp` | Verify OTP, return worker profile + JWT token |
-| `POST` | `/api/auth/register` | Register new worker, creates Worker + Policy in DB |
+### 2. Worker Portal
+* `GET /api/worker/:id` – Fetches a worker's profile details.
+* `GET /api/worker/:id/policy` – Retrieves the active weekly policy.
+* `GET /api/worker/:id/claims` – Fetches a worker's claims history and aggregated payout totals.
+* `GET /api/worker/:id/safe-choice` – Generates a next-day proactive disruption advisory.
 
-### Worker
+### 3. Claims & Triggers
+* `POST /api/worker/:id/covered-check` – Live status endpoint comparing the worker's current metrics with their zone cohort.
+* `POST /api/claims/trigger-check` – Manual override to run the trigger monitor sequence (for demo or testing).
+* `GET /api/claims/:claimId` – Fetches details of a specific claim.
 
-| Method | Endpoint | Description |
-|---|---|---|
-| `GET` | `/api/worker/:id` | Fetch worker profile |
-| `GET` | `/api/worker/:id/policy` | Fetch active weekly policy |
-| `GET` | `/api/worker/:id/claims` | Fetch full claim history with totals |
-| `GET` | `/api/worker/:id/safe-choice` | Next-day proactive disruption alert |
+### 4. Environmental Feeds
+* `GET /api/zone/:zoneKey/conditions` – Fetches live weather conditions and trigger states for a zone.
+* `GET /api/zone/:zoneKey/forecast` – Generates a 7-day neural net trigger probability forecast.
 
-### Coverage & Claims
+### 5. AI Engines
+* `POST /api/ai/calculate-premium` – Computes premium dynamics given raw risk parameters.
+* `POST /api/ai/chat` – Interactive Gemini chat helper (falls back to intent rule-matching if API keys are absent).
+* `GET /api/ai/model-info` – Lists the neural networks, feature indices, and live status.
+* `GET /api/ai/churn-prediction/:workerId` – Evaluates active policy parameters to predict churn risk.
 
-| Method | Endpoint | Description |
-|---|---|---|
-| `POST` | `/api/worker/:id/covered-check` | Live "am I covered right now?" — runs full AI-3 peer check |
-| `POST` | `/api/claims/trigger-check` | Manually trigger a claim evaluation (for testing or worker app) |
-| `GET` | `/api/claims/:claimId` | Fetch individual claim details |
-
-### Zone & Weather
-
-| Method | Endpoint | Description |
-|---|---|---|
-| `GET` | `/api/zone/:zoneKey/conditions` | Live weather conditions for a zone with trigger state |
-| `GET` | `/api/zone/:zoneKey/forecast` | 7-day neural net trigger probability forecast |
-
-### AI Endpoints
-
-| Method | Endpoint | Description |
-|---|---|---|
-| `POST` | `/api/ai/calculate-premium` | Run AI-1 premium calculation for given inputs |
-| `POST` | `/api/ai/chat` | AI chat assistant (Grok-3-mini or rule-based fallback) |
-| `GET` | `/api/ai/model-info` | Full model registry: versions, features, training approach |
-| `GET` | `/api/ai/churn-prediction/:workerId` | Churn probability for a worker |
-
-### Admin
-
-| Method | Endpoint | Description |
-|---|---|---|
-| `GET` | `/api/admin/stats` | Platform-wide KPIs: policies, GPW, BCR, payouts, fraud flags |
-| `GET` | `/api/admin/zones` | All 6 zones with live weather, BCR, worker count, threshold |
-| `GET` | `/api/admin/fraud-flags` | Full fraud flag queue sorted by recency |
-| `POST` | `/api/admin/fraud-flags/:id/resolve` | Resolve a flag: `{ "action": "clear" \| "reject" }` |
-
-### System
-
-| Method | Endpoint | Description |
-|---|---|---|
-| `GET` | `/api/health` | Full system health: DB, weather, ML engine status |
-| `GET` | `/api/config` | Client config (Razorpay key ID for payment integration) |
+### 6. Admin Panel
+* `GET /api/admin/stats` – Computes platform-wide analytics (GPW, average payout times, BCR).
+* `GET /api/admin/zones` – Monitors rain levels, active worker counts, and adaptive thresholds across all 6 zones.
+* `GET /api/admin/fraud-flags` – Fetches active fraud flags.
+* `POST /api/admin/fraud-flags/:id/resolve` – Resolves a fraud flag (actions: `clear` or `reject`).
 
 ---
 
-## Admin Dashboard
+## 🖥️ Admin Dashboard
 
-The admin dashboard is embedded in `index.html` and provides full operational visibility over the GIC platform.
+The built-in admin dashboard provides complete real-time monitoring of the GigInsura platform.
 
 ### Overview Panel
+Displays platform KPIs:
+* **Active Policies:** Total workers currently covered.
+* **Weekly GPW (Gross Premium Written):** Aggregated premium cashflow.
+* **Average Premium:** Blended premium average (historically around ₹63).
+* **Current BCR (Benefit-Cost Ratio):** Claims payout ratio.
+* **Avg Payout Time:** Auto-claim velocity (typically ~3.8 minutes).
 
-Shows live platform KPIs pulled from `/api/admin/stats`:
-- **Active Policies** — total workers currently covered
-- **Weekly GPW** — gross premium written (active policies × avg premium)
-- **Average Premium** — ₹63 current blended average
-- **Current BCR** — 62% baseline claim ratio across the pool
-- **Total Payouts This Week** — count and rupee total
-- **Avg Payout Time** — currently 3.8 minutes
-- **Active Fraud Flags** — flags in `reviewing` or `flagged` status
-
-### Zone Panel
-
-Pulls from `/api/admin/zones` and displays all 6 Chennai zones:
+### Zone Monitor
+Monitors conditions across the 6 operating zones:
 
 | Zone | Risk Level | Active Workers |
-|---|---|---|
-| Velachery | 🔴 Critical | 421 |
-| Adyar | 🟠 High | 847 |
-| Guindy | 🟡 Medium | 556 |
-| T. Nagar | 🟢 Low | 1,203 |
-| Mylapore | 🟢 Low | 634 |
-| Egmore | 🟢 Low | 892 |
+| :--- | :--- | :---: |
+| **Velachery** | 🔴 Critical | 421 |
+| **Adyar** | 🟠 High | 847 |
+| **Guindy** | 🟡 Medium | 556 |
+| **T. Nagar** | 🟢 Low | 1,203 |
+| **Mylapore** | 🟢 Low | 634 |
+| **Egmore** | 🟢 Low | 892 |
 
-Each zone card shows: live rainfall, BCR, adaptive threshold, weather source (Open-Meteo vs simulation).
+### UI Preview
 
-### Fraud Flag Queue
+#### Admin Dashboard Overview
+![Admin overview panel showing active policies, weekly GPW, BCR by zone, fraud flags, and payout stats](https://github.com/user-attachments/assets/56e8c9de-b800-489d-b0f7-a819afac4dea)
 
-Pulled from `/api/admin/fraud-flags`. Each flag shows:
-- Worker ID and zone
-- Anomaly score (0–1)
-- Flag type: `soft` (yellow) / `hard` (red) / `cleared` (green)
-- Full AI-3 signal breakdown: peerDiv, newAcct, frequency, rainGap, temporal
-- Peer context: sample size, active count, low-activity %, claim rate
-- **Clear** / **Reject** action buttons → `POST /api/admin/fraud-flags/:id/resolve`
+#### AI Model Info Panel
+![AI model info card showing all neural net models, their feature counts, training approach, and live status](https://github.com/user-attachments/assets/b58ac8df-ece3-49d6-9c59-8fd4a280a973)
 
-### AI Model Info
-
-Displays the full model registry from `/api/ai/model-info`:
-- All 5 neural networks with feature counts and training approach
-- Grok-3-mini chat status (live key vs fallback)
-- Premium floor/ceiling
-- Adaptive zone thresholds
+#### AI Chat Assistant
+![In-app Gemini chat showing a worker asking about their premium and receiving a contextual breakdown](https://github.com/user-attachments/assets/03767df3-31f8-4e88-9d7b-ac9db6e78af7)
 
 ---
 
-## Database Models
-
-### Worker
-```
-id, name, phone, platform (swiggy/zomato/etc), workerId, zone, zoneId,
-upi, activeDays, joinDate, coverageStatus (building_baseline | active),
-baselineEarnings { lunch, dinner, avg_orders_per_hr },
-streak, riskTier, policyStart
-```
-
-### Policy
-```
-id, workerId, weekStart, weekEnd, premium, premiumBreakdown {
-  base, zoneAdj, streakDiscount, forecastSurcharge, activityAdj
-}, ml_info { model, confidence, claim_probability },
-status, windows [ { type, start, end } ]
-```
-
-### Claim
-```
-id, workerId, date, shift, trigger, amount, status (processing | paid),
-source (automated_monitor | manual_check), payoutTime, upi,
-rainfall_mm_hr, activity_drop_sigma, severity_multiplier, weather_source,
-fraud_check, ai1_approved, ai2_payout, ai2_severity,
-ai3_approved, ai3_flag, ai3_anomaly_score,
-peer_context { peer_drop, peer_low_activity_pct, peer_claim_rate,
-  peer_sample_size, peer_active_count, source },
-initiated_at, completed_at
-```
-
-### FraudFlag
-```
-id, workerId, zone, shift, type (soft | hard | clear),
-reason, anomalyScore, signals {
-  peerDivScore, peerDrop, peerMedianDrop, peerDropStdDev,
-  peerLowActivityPct, peerClaimRate, peerAvgPayout,
-  peerSampleSize, peerActiveCount, newAcctScore, freqScore,
-  rainGapScore, temporalScore
-},
-anomaly_count, status (reviewing | flagged | cleared | rejected),
-generated_at, resolved_at, source, model_version
-```
-
-### TriggerHistory
-```
-zone, rainfall, threshold, confirmed, timestamp
-```
-
----
-
-## Getting Started
+## 💻 Local Setup
 
 ### Prerequisites
+* **Node.js** (v18.x or higher)
+* **MongoDB Atlas** database account
+* *Optional:* Google Gemini API Key and WAQI API Token.
 
-- Node.js ≥ 18.0.0
-- MongoDB Atlas cluster (free tier works)
-- Optional: WAQI token, X.AI API key
+### Installation & Launch
 
-### Install
+1. **Clone the Repository:**
+   ```bash
+   git clone https://github.com/Samarth-3910/Gig_Insura.git
+   cd Gig_Insura
+   ```
 
-```bash
-git clone https://github.com/your-org/gic-backend
-cd gic-backend
-npm install
-```
+2. **Install Dependencies:**
+   ```bash
+   npm install
+   ```
 
-### Environment Setup
+3. **Configure Environment Variables:**
+   Create a `.env` file in the root directory:
+   ```env
+   PORT=3001
+   MONGODB_URI=your_mongodb_atlas_connection_string
+   GEMINI_API_KEY=your_google_gemini_api_key
+   WAQI_TOKEN=your_waqi_api_token
+   ```
 
-```bash
-cp .env.example .env
-# Fill in MONGODB_URI, WAQI_TOKEN, XAI_API_KEY
-```
-
-### Run
-
-```bash
-# Development (with auto-reload)
-npm run dev
-
-# Production
-npm start
-```
-
-On startup the server will:
-1. Connect to MongoDB Atlas and seed default worker/policy/claim/fraud data if the DB is empty
-2. Train all 4 `brain.js` neural networks (takes ~5–10 seconds)
-3. Start the trigger monitor daemon (runs every 5 minutes)
-4. Listen on `http://localhost:3001`
+4. **Run in Development Mode:**
+   ```bash
+   npm run dev
+   ```
+   *On startup, the server connects to MongoDB, seeds initial database structures, runs the local training cycles for the 4 neural networks, and initializes the background trigger monitor.*
 
 ---
 
-## Environment Variables
+## 👨‍💻 Project Metadata & Team
 
-| Variable | Required | Description |
-|---|---|---|
-| `MONGODB_URI` | ✅ Yes | MongoDB Atlas connection string |
-| `WAQI_TOKEN` | Optional | WAQI air quality API token — get free at [waqi.info](https://waqi.info/api) |
-| `XAI_API_KEY` | Optional | X.AI API key for Grok-3-mini chat — get at [x.ai](https://x.ai) |
-| `RAZORPAY_KEY_ID` | Optional | Razorpay key for payment integration (Phase 4) |
-| `PORT` | Optional | Server port (default: 3001) |
+* **Hackathon:** Guidewire DEVTrails 2026 — *Unicorn Chase*
+* **Team Name:** RiskMatrix
 
----
+### Team Members
 
-## What Sets GIC Apart
-
-**1. Fully Parametric — No Claim Forms**
-Most gig worker insurance products still require manual filing and human adjudication. GIC is end-to-end automatic. A worker never touches the claims process.
-
-**2. Peer-Validated Triggers**
-GIC doesn't just look at one worker's activity. It benchmarks against a same-platform, same-zone cohort in real time. If 60% of Swiggy workers in Adyar show a drop, that's a zone event — not fraud. This is what makes the fraud detection genuinely smart rather than just a rule engine.
-
-**3. Five Purpose-Built Neural Networks**
-AI-1, AI-3, Churn, and Forecast are separate `brain.js` networks trained on domain-specific synthetic data. Each model's feature weights reflect real insurance actuarial logic, not generic ML scaffolding.
-
-**4. Adaptive Zone Thresholds**
-Velachery (chronic flooding) and Adyar (coastal) have different rain thresholds from T. Nagar. The trigger system knows this and adjusts automatically.
-
-**5. Transparent Payout Math**
-AI-2 is a published formula, not a black box. Workers can independently verify their payout by checking the rainfall value and their activity drop — every figure is surfaced in the claim response.
-
-**6. Honest Fallbacks**
-Every external dependency — weather, AQI, LLM chat — has a graceful, clearly labelled fallback. The `source` field in every API response tells you exactly whether the data is live or simulated.
-
-**7. Sub-5-Minute Payouts**
-The auto-claim pipeline targets ~4 minutes from trigger detection to UPI transfer. Manual insurance typically takes 2–4 weeks.
-
-**8. Full Audit Trail**
-Every claim stores its full AI-3 signal vector, peer context, rainfall reading, weather source, and timestamp. Every fraud flag stores its full signal breakdown. Nothing is a black box to the admin.
-
----
-
-## Pitch Deck
-
-Link for Pitch Deck - https://docs.google.com/presentation/d/1gg-y3pf1Vrq_z-IqS6rlKz-l2R6qjkZR/edit?usp=sharing&ouid=115617659625771048360&rtpof=true&sd=true
-
----
-
-## Collaborators
-
-<table align="center">
-  <tr>
-    <td align="center">
-      <a href="https://github.com/Samarth230">
-        <img src="https://github.com/Samarth230.png" width="80px"/><br/>
-        <sub><b>Samarth230</b></sub>
-      </a>
-    </td>
-    <td align="center">
-      <a href="https://github.com/rohanrpais">
-        <img src="https://github.com/rohanrpais.png" width="80px"/><br/>
-        <sub><b>rohanrpais</b></sub>
-      </a>
-    </td>
-    <td align="center">
-      <a href="https://github.com/devu2406">
-        <img src="https://github.com/devu2406.png" width="80px"/><br/>
-        <sub><b>devu2406</b></sub>
-      </a>
-    </td>
-    <td align="center">
-      <a href="https://github.com/Chandroja3011">
-        <img src="https://github.com/Chandroja3011.png" width="80px"/><br/>
-        <sub><b>Chandroja3011</b></sub>
-      </a>
-    </td>
-    <td align="center">
-      <a href="https://github.com/AryanSingh2025">
-        <img src="https://github.com/AryanSingh2025.png" width="80px"/><br/>
-        <sub><b>AryanSingh2025</b></sub>
-      </a>
-    </td>
-  </tr>
-</table>
-
----
-
-## Team
-
-**CARDS** · Guidewire DEVTrails 2026 · Unicorn Chase
-*GIC — Built for the 12 million gig workers in India who lose income every monsoon season with no recourse.*
-
+| Name | Role |
+| :--- | :--- |
+| **Satvik Chaurasia** | Team Lead · Full Stack Developer |
+| **Raghvendra Chauhan** | Backend · Fraud Detection ML |
+| **Suryansh Chauhan** | Frontend · React Native · UX |
+| **Samarth Kesari** | AI/ML · Risk Scoring · Dynamic Pricing |
+| **Gargi Sharma** | Research · Strategy · Documentation |
