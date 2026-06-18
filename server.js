@@ -1,5 +1,5 @@
 /**
- * GIC Backend — Phase 3 API
+ * GigInsura Backend — Phase 3 API
  * Node.js + Express + MongoDB + brain.js Neural Networks
  */
 
@@ -119,7 +119,7 @@ async function calcPremiumML(zoneRiskLevel, streak, forecastRisk, activeDays, zo
     premium: nn.premium, base: 29, zoneAdj, streakDisc, forecastSurcharge,
     activityAdj: Math.round((1 - Math.min(activeDays / 30, 1)) * 8),
     seasonalAdj: Math.round((seasonal - 0.5) * 10),
-    model_version: 'GIC-NN-v3.2', confidence: nn.confidence,
+    model_version: 'GigInsura-NN-v3.2', confidence: nn.confidence,
     claim_probability: nn.raw_score, risk_tier: zoneRisk > 0.6 ? 'high' : zoneRisk < 0.3 ? 'low' : 'medium',
     nn_source: nn.source,
   };
@@ -275,7 +275,7 @@ async function mlFraudCheck(worker, rainfall, activityDrop, options = {}) {
       type: flagType, reason: anomalies.join('. ') || 'Neural net anomaly score exceeded threshold',
       anomalyScore, signals: { peerDivScore, peerDrop, peerMedianDrop: peerStats.peerMedianDrop, peerDropStdDev: peerStats.peerDropStdDev, peerLowActivityPct: peerStats.peerLowActivityPct, peerClaimRate: peerStats.peerClaimRate, peerAvgPayout: peerStats.peerAvgPayout, peerSampleSize: peerStats.peerSampleSize, peerActiveCount: peerStats.peerActiveCount, newAcctScore, freqScore, rainGapScore, temporalScore },
       anomaly_count: anomalies.length, status: flagType === 'hard' ? 'flagged' : 'reviewing',
-      generated_at: new Date().toISOString(), source: peerStats.source, model_version: 'GIC-NN-v3.2',
+      generated_at: new Date().toISOString(), source: peerStats.source, model_version: 'GigInsura-NN-v3.2',
     });
     console.log(`[AI-3] ${flagType.toUpperCase()} flag: ${worker.id} score=${anomalyScore} (neural net)`);
   }
@@ -380,9 +380,9 @@ app.get('/api/health', (req, res) => {
     status: 'ok', version: '3.2', phase: 3, timestamp: new Date().toISOString(),
     database: 'mongodb_atlas', weather_source: 'open-meteo', aqi_source: 'waqi', monitor_active: true,
     ml_engines: {
-      ai1: 'GIC-NN-v3.2 (brain.js neural net — premium scoring)',
+      ai1: 'GigInsura-NN-v3.2 (brain.js neural net — premium scoring)',
       ai2: 'severity-weighted payout calculator',
-      ai3: 'GIC-NN-v3.2 (brain.js neural net — fraud detection)',
+      ai3: 'GigInsura-NN-v3.2 (brain.js neural net — fraud detection)',
       churn: 'brain.js neural net — worker churn prediction',
       forecast: 'brain.js neural net — rainfall trigger forecast',
     },
@@ -563,11 +563,11 @@ app.post('/api/ai/chat', async (req, res) => {
     } else if (lastMsg.includes('claim') || lastMsg.includes('history')) {
       reply = 'Your recent claims are shown in the dashboard. Each claim is auto-triggered when both rain and activity conditions are met — no manual filing needed.';
     } else if (lastMsg.includes('zone') || lastMsg.includes('area') || lastMsg.includes('location')) {
-      reply = 'GIC covers 6 Chennai zones: Adyar (high risk), T. Nagar (low), Mylapore (low), Velachery (critical), Guindy (medium), Egmore (low). Your zone determines your premium and rain threshold.';
+      reply = 'GigInsura covers 6 Chennai zones: Adyar (high risk), T. Nagar (low), Mylapore (low), Velachery (critical), Guindy (medium), Egmore (low). Your zone determines your premium and rain threshold.';
     } else if (lastMsg.includes('streak') || lastMsg.includes('discount') || lastMsg.includes('save')) {
       reply = 'Each claim-free week adds to your streak, which reduces your premium. A 12-week streak can save you up to ₹18/week. Filing a claim resets the streak.';
     } else {
-      reply = 'GIC provides automatic weekly income coverage for delivery workers in Chennai. Ask me about your premium, rain triggers, payouts, fraud checks, or claim history.';
+      reply = 'GigInsura provides automatic weekly income coverage for delivery workers in Chennai. Ask me about your premium, rain triggers, payouts, fraud checks, or claim history.';
     }
     res.json({ reply, model: 'rule-based-fallback', source: 'local' });
   }
@@ -576,11 +576,11 @@ app.post('/api/ai/chat', async (req, res) => {
 app.get('/api/ai/model-info', (req, res) => {
   res.json({
     models: {
-      ai1: { name: 'GIC-NN-v3.2', type: 'brain.js-neural-network', features: 6, output: 'weekly_premium_inr', training: 'synthetic_domain_data' },
+      ai1: { name: 'GigInsura-NN-v3.2', type: 'brain.js-neural-network', features: 6, output: 'weekly_premium_inr', training: 'synthetic_domain_data' },
       ai2: { name: 'severity-weighted-payout', type: 'parametric-formula', output: 'payout_inr' },
-      ai3: { name: 'GIC-NN-v3.2', type: 'brain.js-neural-network', features: 5, output: 'anomaly_score', training: 'structured_fraud_data', peer_comparison: 'same_zone_same_platform_cohort' },
-      churn: { name: 'GIC-CHURN-v3.2', type: 'brain.js-neural-network', features: 6, output: 'churn_probability' },
-      forecast: { name: 'GIC-FORECAST-v3.2', type: 'brain.js-neural-network', features: 5, output: 'trigger_probability' },
+      ai3: { name: 'GigInsura-NN-v3.2', type: 'brain.js-neural-network', features: 5, output: 'anomaly_score', training: 'structured_fraud_data', peer_comparison: 'same_zone_same_platform_cohort' },
+      churn: { name: 'GigInsura-CHURN-v3.2', type: 'brain.js-neural-network', features: 6, output: 'churn_probability' },
+      forecast: { name: 'GigInsura-FORECAST-v3.2', type: 'brain.js-neural-network', features: 5, output: 'trigger_probability' },
       chat: { name: 'gemini-2.5-flash', provider: 'google', status: process.env.GEMINI_API_KEY ? 'live' : 'fallback' },
     },
     database: 'mongodb_atlas', weather: 'open-meteo', aqi: 'waqi',
@@ -695,7 +695,7 @@ app.get('/api/zone/:zoneKey/forecast', (req, res) => {
       nn_source: pred.source,
     };
   });
-  res.json({ zone: zoneKey, forecast, model: 'GIC-FORECAST-v3.2' });
+  res.json({ zone: zoneKey, forecast, model: 'GigInsura-FORECAST-v3.2' });
 });
 
 app.get('/api/worker/:id/safe-choice', async (req, res) => {
@@ -731,7 +731,7 @@ app.get('/api/ai/churn-prediction/:workerId', async (req, res) => {
     workerId: worker.id, name: worker.name, churn_probability: pred.churn_probability,
     risk_level: pred.churn_probability > 0.6 ? 'high' : pred.churn_probability > 0.35 ? 'medium' : 'low',
     factors: { streak: worker.streak, total_claims: claims.length, premium_to_earnings_ratio: parseFloat(premRatio.toFixed(3)), days_since_last_payout: Math.round(daysSinceLastPayout), zone_risk: zoneRisk, weeks_enrolled: Math.round(weeksEnrolled) },
-    nn_source: pred.source, model: 'GIC-CHURN-v3.2',
+    nn_source: pred.source, model: 'GigInsura-CHURN-v3.2',
   });
 });
 

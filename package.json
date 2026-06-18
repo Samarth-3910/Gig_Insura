@@ -1,7 +1,7 @@
 {
-  "name": "gic-backend",
+  "name": "giginsura-backend",
   "version": "2.0.0",
-  "description": "GIC — Gig Income Coverage · Phase 3 Backend API",
+  "description": "GigInsura — Gig Income Coverage · Phase 3 Backend API",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",

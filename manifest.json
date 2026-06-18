@@ -1,6 +1,6 @@
 {
-  "name": "GIC — Gig Income Coverage",
-  "short_name": "GIC",
+  "name": "GigInsura — Gig Income Coverage",
+  "short_name": "GigInsura",
   "description": "AI-powered parametric income insurance for India's delivery workers. Zero claims. Automatic payouts.",
   "start_url": "./",
   "display": "standalone",
