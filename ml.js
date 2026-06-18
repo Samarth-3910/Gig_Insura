@@ -1,8 +1,8 @@
 const brain = require('brain.js');
 
-let premiumNet  = null;
-let fraudNet    = null;
-let churnNet    = null;
+let premiumNet = null;
+let fraudNet = null;
+let churnNet = null;
 let forecastNet = null;
 
 function normalizeBrainOutput(output) {
@@ -18,10 +18,10 @@ function normalizeBrainOutput(output) {
 
 function generatePremiumTrainingData() {
   const data = [];
-  const zones   = [0.15, 0.42, 0.68, 0.90];
+  const zones = [0.15, 0.42, 0.68, 0.90];
   const streaks = [0, 0.08, 0.17, 0.33, 0.5, 0.67, 1.0];
-  const days    = [0, 0.17, 0.33, 0.5, 0.83, 1.0];
-  const bcrs    = [0.4, 0.55, 0.65, 0.75, 0.85];
+  const days = [0, 0.17, 0.33, 0.5, 0.83, 1.0];
+  const bcrs = [0.4, 0.55, 0.65, 0.75, 0.85];
 
   for (const z of zones) {
     for (const s of streaks) {
@@ -31,7 +31,7 @@ function generatePremiumTrainingData() {
             for (const season of [0.3, 0.5, 0.8]) {
               const risk = z * 0.25 + b * 0.20 + (1 - s) * 0.15 + f * 0.15 + season * 0.10 + (1 - d) * 0.10 + (Math.random() - 0.5) * 0.04;
               data.push({
-                input:  [z, s, d, b, f, season],
+                input: [z, s, d, b, f, season],
                 output: [Math.max(0, Math.min(1, risk))],
               });
             }
@@ -44,18 +44,15 @@ function generatePremiumTrainingData() {
 }
 
 function generateFraudTrainingData() {
-  // Structured training: peerDiv (0) is the dominant fraud signal, newAcct (1) and
-  // claimFreq (2) are secondary, rainGap (3) and temporal (4) are weaker signals.
-  // This mirrors the actual feature semantics in mlFraudCheck.
   const data = [];
   for (let i = 0; i < 800; i++) {
-    const peerDiv    = Math.random();
-    const newAcct    = Math.random();
-    const claimFreq  = Math.random();
-    const rainGap    = Math.random();
-    const temporal   = Math.random();
+    const peerDiv = Math.random();
+    const newAcct = Math.random();
+    const claimFreq = Math.random();
+    const rainGap = Math.random();
+    const temporal = Math.random();
     const score = peerDiv * 0.35 + newAcct * 0.20 + claimFreq * 0.20
-                + rainGap * 0.15 + temporal * 0.10 + (Math.random() - 0.5) * 0.04;
+      + rainGap * 0.15 + temporal * 0.10 + (Math.random() - 0.5) * 0.04;
     data.push({
       input: [peerDiv, newAcct, claimFreq, rainGap, temporal],
       output: [Math.max(0, Math.min(1, score))]

@@ -1,4 +1,6 @@
 const mongoose = require('mongoose');
+const dns      = require('dns');
+const { exec } = require('child_process');
 
 const workerSchema = new mongoose.Schema({
   id:               { type: String, required: true, unique: true },
@@ -92,12 +94,35 @@ const Claim          = mongoose.model('Claim',          claimSchema);
 const FraudFlag      = mongoose.model('FraudFlag',      fraudFlagSchema);
 const TriggerHistory = mongoose.model('TriggerHistory', triggerHistorySchema);
 
+function setupDnsServers() {
+  return new Promise((resolve) => {
+    if (process.platform !== 'win32') return resolve();
+    exec('powershell -Command "Get-DnsClientServerAddress -AddressFamily IPv4 | Select-Object -ExpandProperty ServerAddresses"', (err, stdout) => {
+      if (err || !stdout) return resolve();
+      const ips = stdout.split(/\r?\n/)
+        .map(ip => ip.trim())
+        .filter(ip => ip && ip !== '127.0.0.1' && /^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$/.test(ip));
+      if (ips.length > 0) {
+        try {
+          const uniqueIps = [...new Set(ips)];
+          dns.setServers(uniqueIps);
+          console.log('[DNS] Configured DNS servers from system:', uniqueIps);
+        } catch (e) {
+          console.warn('[DNS] Failed to set servers:', e.message);
+        }
+      }
+      resolve();
+    });
+  });
+}
+
 async function connectDB() {
   const uri = process.env.MONGODB_URI;
   if (!uri) {
     console.warn('[DB] MONGODB_URI not set — using in-memory fallback');
     return false;
   }
+  await setupDnsServers();
   try {
     await mongoose.connect(uri);
     console.log('[DB] Connected to MongoDB Atlas');

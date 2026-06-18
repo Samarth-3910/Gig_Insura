@@ -347,20 +347,24 @@ async function runTriggerMonitor() {
   console.log(`[MONITOR] Cycle complete — ${fired} claim(s)`);
 }
 
-// ─── X_AI / GROK CHAT ───
-async function callGrok(systemPrompt, messages) {
-  const apiKey = process.env.XAI_API_KEY;
-  if (!apiKey) throw new Error('XAI_API_KEY not configured');
+// ─── GEMINI CHAT ───
+async function callGemini(systemPrompt, messages) {
+  const apiKey = process.env.GEMINI_API_KEY;
+  if (!apiKey) throw new Error('GEMINI_API_KEY not configured');
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 12000);
   try {
-    const r = await fetch('https://api.x.ai/v1/chat/completions', {
+    const formattedMessages = messages.map(msg => ({
+      role: msg.role === 'assistant' ? 'assistant' : msg.role,
+      content: msg.content
+    }));
+    const r = await fetch('https://generativelanguage.googleapis.com/v1beta/openai/chat/completions', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}` },
-      body: JSON.stringify({ model: 'grok-3-mini', max_tokens: 500, temperature: 0.4, messages: [{ role: 'system', content: systemPrompt }, ...messages] }),
+      body: JSON.stringify({ model: 'gemini-2.5-flash', max_tokens: 500, temperature: 0.4, messages: [{ role: 'system', content: systemPrompt }, ...formattedMessages] }),
       signal: controller.signal,
     });
-    if (!r.ok) throw new Error(`X_AI ${r.status}`);
+    if (!r.ok) throw new Error(`Gemini ${r.status}`);
     const d = await r.json();
     return d.choices?.[0]?.message?.content || '';
   } finally {
@@ -382,7 +386,7 @@ app.get('/api/health', (req, res) => {
       churn: 'brain.js neural net — worker churn prediction',
       forecast: 'brain.js neural net — rainfall trigger forecast',
     },
-    ai_chat: process.env.XAI_API_KEY ? 'grok-3-mini (live)' : 'rule-based fallback',
+    ai_chat: process.env.GEMINI_API_KEY ? 'gemini-2.5-flash (live)' : 'rule-based fallback',
   });
 });
 
@@ -542,10 +546,10 @@ app.post('/api/ai/chat', async (req, res) => {
   const { system, messages } = req.body;
   if (!messages || !Array.isArray(messages)) return res.status(400).json({ error: 'messages array required' });
   try {
-    const reply = await callGrok(system || 'You are a helpful insurance assistant.', messages);
-    res.json({ reply, model: 'grok-3-mini', source: 'x_ai' });
+    const reply = await callGemini(system || 'You are a helpful insurance assistant.', messages);
+    res.json({ reply, model: 'gemini-2.5-flash', source: 'gemini' });
   } catch (e) {
-    console.warn('[AI-CHAT] Grok call failed:', e.message);
+    console.warn('[AI-CHAT] Gemini call failed:', e.message);
     const lastMsg = (messages[messages.length - 1]?.content || '').toLowerCase();
     let reply;
     if (lastMsg.includes('premium') || lastMsg.includes('cost') || lastMsg.includes('pay') || lastMsg.includes('price')) {
@@ -577,7 +581,7 @@ app.get('/api/ai/model-info', (req, res) => {
       ai3: { name: 'GIC-NN-v3.2', type: 'brain.js-neural-network', features: 5, output: 'anomaly_score', training: 'structured_fraud_data', peer_comparison: 'same_zone_same_platform_cohort' },
       churn: { name: 'GIC-CHURN-v3.2', type: 'brain.js-neural-network', features: 6, output: 'churn_probability' },
       forecast: { name: 'GIC-FORECAST-v3.2', type: 'brain.js-neural-network', features: 5, output: 'trigger_probability' },
-      chat: { name: 'grok-3-mini', provider: 'x_ai', status: process.env.XAI_API_KEY ? 'live' : 'fallback' },
+      chat: { name: 'gemini-2.5-flash', provider: 'google', status: process.env.GEMINI_API_KEY ? 'live' : 'fallback' },
     },
     database: 'mongodb_atlas', weather: 'open-meteo', aqi: 'waqi',
     premium_range: { floor: 29, ceiling: 89, base: 29 },
@@ -748,7 +752,7 @@ async function start() {
     console.log('\nGIC Backend — Phase 3 v3.2');
     console.log('Running on http://localhost:' + PORT);
     console.log('Database: ' + (dbReady ? 'MongoDB Atlas' : 'NOT CONNECTED — add 0.0.0.0/0 to Atlas Network Access'));
-    console.log('Weather: Open-Meteo | AQI: WAQI | Chat: ' + (process.env.XAI_API_KEY ? 'grok-3-mini' : 'fallback'));
+    console.log('Weather: Open-Meteo | AQI: WAQI | Chat: ' + (process.env.GEMINI_API_KEY ? 'gemini-2.5-flash' : 'fallback'));
     console.log('ML: 4 brain.js neural networks (premium, fraud, churn, forecast)');
     console.log('Premium: Rs.29 base / Rs.89 ceiling\n');
 
