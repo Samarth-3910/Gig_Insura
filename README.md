@@ -1,5 +1,5 @@
 # GigInsura
-### AI-Powered Parametric Income Insurance for India's Gig Economy · Phase 3 v3.2
+### AI-Powered Parametric Income Insurance for India's Gig Economy · Phase 3 v3.2 
 
 > **No claim forms. No manual adjusters. No waiting.**
 > GigInsura is an automated, trigger-based parametric income protection platform designed exclusively for food delivery partners (e.g., Zomato and Swiggy). By monitoring weather, zone-wide peer activity, and native device fraud signals in real-time, GigInsura auto-triggers and pays out claims via UPI in under 4 minutes when disruptions occur.
